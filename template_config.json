@@ -1,0 +1,6 @@
+{
+    "CROMWELL_HOST" : "0.0.0.0",
+    "CROMWELL_PORT" : "80",
+    "OUTOUT_DIRECTORY" : ".",
+    "OUTPUT_NAME" : "data"
+}

@@ -166,12 +166,11 @@ if __name__ == "__main__":
         OUTPUT_DIR = config["OUTOUT_DIRECTORY"]
         OUTPUT_NAME = config["OUTPUT_NAME"]
 
-    # # Authenticate with Cromwell with no Auth
-    # auth = CromwellAuth.harmonize_credentials(url=CROMWELL_URL)
-    # apiResults = api.query({}, auth)
-    # # Create dataframe from resulting json file
-    # df = pd.DataFrame(apiResults.json()['results'])
-    # # Drop some columns
-    # df = df[COLUMNS]
-
-    df.to_csv(f"{OUTPUT_DIR}/{OUTPUT_NAME}_{datatime.now()}.csv")
+    # Authenticate with Cromwell with no Auth
+    auth = CromwellAuth.harmonize_credentials(url=CROMWELL_URL)
+    apiResults = api.query({}, auth)
+    # Create dataframe from resulting json file
+    df = pd.DataFrame(apiResults.json()['results'])
+    # Drop some columns
+    df = df[COLUMNS]
+    df.to_csv(f"{OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now()}.csv")
