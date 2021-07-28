@@ -107,11 +107,15 @@ def getMetaDataInfo(cromwell_id, auth):
     except Exception as e:
         logging.exception(f"Cannot get metaData : {e}")
 
-    # Get the name of the run
-    name = list(metaData['calls'].keys())[0]
     # Setup majority of the data
-    data = metaData['calls'][name][0]['runtimeAttributes']
-    data['id'] = cromwell_id
+    try:
+        # Get the name of the run
+        name = list(metaData['calls'].keys())[0]
+        data = metaData['calls'][name][0]['runtimeAttributes']
+        data['id'] = cromwell_id
+    except (IndexError, KeyError):
+        # print(metaData)
+        return {'id': cromwell_id}
 
     # Check if there are input files in the metadata if not return nan
     try:
@@ -119,7 +123,7 @@ def getMetaDataInfo(cromwell_id, auth):
             metaData['submittedFiles']['inputs'])
     except KeyError:
         data['input_size_bytes'] = np.nan
-        data['inputs'] = "none"
+        # data['inputs'] = "none"
         data['input_compressed'] = False
         return data
 
