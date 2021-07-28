@@ -5,7 +5,7 @@ import numpy as np
 import json
 from pathlib import Path
 import logging
-import datetime
+from datetime import datetime
 
 
 COLUMNS = ['end', 'id', 'name', 'start', 'status', 'submission']
