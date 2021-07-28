@@ -159,12 +159,15 @@ def getMetaDataInfo(cromwell_id, auth):
     return data
 
 
-if __name__ == "__main__":
-    with open("config.json", 'r') as f:
-        config = json.load(f)
-        CROMWELL_URL = f'http://{config["CROMWELL_HOST"]}:{config["CROMWELL_PORT"]}'
-        OUTPUT_DIR = config["OUTOUT_DIRECTORY"]
-        OUTPUT_NAME = config["OUTPUT_NAME"]
+def update():
+    try:
+        with open("services/config.json", 'r') as f:
+            config = json.load(f)
+            CROMWELL_URL = f'http://{config["CROMWELL_HOST"]}:{config["CROMWELL_PORT"]}'
+            OUTPUT_DIR = config["OUTOUT_DIRECTORY"]
+            OUTPUT_NAME = config["OUTPUT_NAME"]
+    except:
+        return "Can't find config"
 
     # Authenticate with Cromwell with no Auth
     auth = CromwellAuth.harmonize_credentials(url=CROMWELL_URL)
@@ -174,3 +177,8 @@ if __name__ == "__main__":
     # Drop some columns
     df = df[COLUMNS]
     df.to_csv(f"{OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now()}.csv")
+    return f'New file at: {OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now()}.csv'
+
+
+if __name__ == "__main__":
+    update()

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  </head>
+  <body>
+    <h1>Start: {{ start }}</h1>
+    <h1>End: {{ end }}</h1>
+    <div>
+        <p>{{ message }}</p>
+        <form action="/update" method="POST">
+            <input type="submit" value="Run Script">
+        </form>
+    </div>
+  </body>
+</html>
