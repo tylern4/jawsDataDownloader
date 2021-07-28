@@ -159,9 +159,9 @@ def getMetaDataInfo(cromwell_id, auth):
     return data
 
 
-def update():
+def update(config: str = "services/config.json") -> str:
     try:
-        with open("services/config.json", 'r') as f:
+        with open(config, 'r') as f:
             config = json.load(f)
             CROMWELL_URL = f'http://{config["CROMWELL_HOST"]}:{config["CROMWELL_PORT"]}'
             OUTPUT_DIR = config["OUTOUT_DIRECTORY"]
