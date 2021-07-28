@@ -163,6 +163,18 @@ def getMetaDataInfo(cromwell_id, auth):
     return data
 
 
+@np.vectorize
+def getMemory(mem, memory):
+    if isinstance(mem, str):
+        mem = mem.replace("G", "")
+        return float(mem)
+    elif isinstance(memory, str):
+        memory = memory.replace("GB", "")
+        return float(memory)
+    else:
+        return np.nan
+
+
 def update(config: str = "services/config.json") -> str:
     try:
         with open(config, 'r') as f:
@@ -173,15 +185,41 @@ def update(config: str = "services/config.json") -> str:
     except:
         return "Can't find config"
 
+    start = datetime.now()
     # Authenticate with Cromwell with no Auth
     auth = CromwellAuth.harmonize_credentials(url=CROMWELL_URL)
-    apiResults = api.query({}, auth)
+    apiResults = api.query({'status': 'Succeeded'}, auth)
     # Create dataframe from resulting json file
-    df = pd.DataFrame(apiResults.json()['results'])
+    cromwellData = pd.DataFrame(apiResults.json()['results'])
+    # Only keep data for succesful jobs
+    cromwellData = cromwellData[cromwellData.status == 'Succeeded']
     # Drop some columns
-    df = df[COLUMNS]
-    df.to_csv(f"{OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now()}.csv")
-    return f'New file at: {OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now()}.csv'
+    COLUMNS = ['name', 'id', 'submission', 'start', 'end']
+    cromwellData = cromwellData[COLUMNS]
+    end1 = datetime.now()
+
+    metaData = getMetaDataInfo(cromwellData.id, auth)
+    metaData = pd.DataFrame.from_records(metaData)
+
+    # Looks like the column name changed at some point
+    # This merges them back into the memory column
+    metaData['memory'] = getMemory(metaData.mem, metaData.memory)
+    metaData['docker'] = metaData['docker'].fillna("none")
+
+    # print(metaData.columns)
+    META_COLUMNS = ['poolname', 'shared', 'nwpn', 'cluster', 'cpu', 'constraint',
+                    'node', 'account', 'time', 'qos', 'memory', 'id', 'input_size_bytes',
+                    'input_compressed', 'docker']
+    metaData = metaData[META_COLUMNS]
+
+    data = pd.merge(left=cromwellData, right=metaData,
+                    left_on='id', right_on='id')
+    data = data[~data.account.isnull()]
+    data['submission'] = np.where(
+        data.submission.isnull(), data.start, data.submission)
+    data['shared'] = data['shared'].astype(bool)
+    data.to_csv(f"{OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now():%m-%d-%Y}.csv")
+    print("total time", datetime.now()-start)
 
 
 if __name__ == "__main__":

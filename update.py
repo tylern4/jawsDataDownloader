@@ -10,4 +10,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    update(config=args.config)
+    print(update(config=args.config))
