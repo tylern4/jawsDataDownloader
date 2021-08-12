@@ -175,7 +175,7 @@ def getMemory(mem, memory):
         return np.nan
 
 
-def update(config: str = "services/config.json") -> str:
+def update(config: str = "services/config.json", alltime: bool = False) -> str:
     try:
         with open(config, 'r') as f:
             config = json.load(f)
@@ -188,14 +188,24 @@ def update(config: str = "services/config.json") -> str:
     start = datetime.now()
     # Authenticate with Cromwell with no Auth
     auth = CromwellAuth.harmonize_credentials(url=CROMWELL_URL)
-    apiResults = api.query({'status': 'Succeeded'}, auth)
+    if not alltime:
+        TIME = f'{start.year}-{start.month:02d}-{start.day-2:02d}T00:00:00.000Z'
+        apiResults = api.query({'status': 'Succeeded', 'start': TIME}, auth)
+    else:
+        apiResults = api.query({'status': 'Succeeded'}, auth)
+
+    if apiResults.json()['totalResultsCount'] == 0:
+        exit()
+    else:
+        print(f"Downloading {apiResults.json()['totalResultCount']} results")
+
     # Create dataframe from resulting json file
     cromwellData = pd.DataFrame(apiResults.json()['results'])
-    # Only keep data for succesful jobs
-    cromwellData = cromwellData[cromwellData.status == 'Succeeded']
-    # Drop some columns
+
+    # Only keep these columns
     COLUMNS = ['name', 'id', 'submission', 'start', 'end']
     cromwellData = cromwellData[COLUMNS]
+    cromwellData['start']
     end1 = datetime.now()
 
     metaData = getMetaDataInfo(cromwellData.id, auth)
@@ -203,7 +213,10 @@ def update(config: str = "services/config.json") -> str:
 
     # Looks like the column name changed at some point
     # This merges them back into the memory column
-    metaData['memory'] = getMemory(metaData.mem, metaData.memory)
+    try:
+        metaData['memory'] = getMemory(metaData.mem, metaData.memory)
+    except AttributeError:
+        metaData['memory'] = getMemory(None, metaData.memory)
     metaData['docker'] = metaData['docker'].fillna("none")
 
     # print(metaData.columns)
