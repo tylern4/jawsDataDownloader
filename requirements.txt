@@ -1,5 +1,3 @@
 pandas
 cromwell_tools
 numpy
-gunicorn
-flask

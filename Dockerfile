@@ -4,10 +4,14 @@ WORKDIR /code
 ADD requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY webApp /app/
-WORKDIR /app
+COPY . /app/
+ENV PYTHONPATH=$PYTHONPATH:/app:/app/src
 
 
+WORKDIR /work
 
-ENTRYPOINT [ "gunicorn" ]
-CMD [ "app:app", "--reload", "-w 2", "-b 0.0.0.0:8000" ]
+# ENTRYPOINT ["ls", "-latr"]
+
+ENTRYPOINT [ "/opt/conda/bin/python3", "/app/update.py" ]
+CMD ["--all", "--config", "config.json"]
+

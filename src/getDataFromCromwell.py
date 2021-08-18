@@ -175,7 +175,7 @@ def getMemory(mem, memory):
         return np.nan
 
 
-def update(config: str = "services/config.json", alltime: bool = False) -> str:
+def update(config: str = "config.json", alltime: bool = False, days: int = 0) -> str:
     try:
         with open(config, 'r') as f:
             config = json.load(f)
@@ -189,15 +189,16 @@ def update(config: str = "services/config.json", alltime: bool = False) -> str:
     # Authenticate with Cromwell with no Auth
     auth = CromwellAuth.harmonize_credentials(url=CROMWELL_URL)
     if not alltime:
-        TIME = f'{start.year}-{start.month:02d}-{start.day-2:02d}T00:00:00.000Z'
+        TIME = f'{start.year}-{start.month:02d}-{start.day-days:02d}T00:00:00.000Z'
         apiResults = api.query({'status': 'Succeeded', 'start': TIME}, auth)
     else:
         apiResults = api.query({'status': 'Succeeded'}, auth)
 
-    if apiResults.json()['totalResultsCount'] == 0:
+    totalResultsCount = apiResults.json()['totalResultsCount']
+    if totalResultsCount == 0:
         exit()
     else:
-        print(f"Downloading {apiResults.json()['totalResultCount']} results")
+        print(f"Downloading {totalResultsCount} results")
 
     # Create dataframe from resulting json file
     cromwellData = pd.DataFrame(apiResults.json()['results'])
@@ -206,7 +207,6 @@ def update(config: str = "services/config.json", alltime: bool = False) -> str:
     COLUMNS = ['name', 'id', 'submission', 'start', 'end']
     cromwellData = cromwellData[COLUMNS]
     cromwellData['start']
-    end1 = datetime.now()
 
     metaData = getMetaDataInfo(cromwellData.id, auth)
     metaData = pd.DataFrame.from_records(metaData)
@@ -217,9 +217,12 @@ def update(config: str = "services/config.json", alltime: bool = False) -> str:
         metaData['memory'] = getMemory(metaData.mem, metaData.memory)
     except AttributeError:
         metaData['memory'] = getMemory(None, metaData.memory)
-    metaData['docker'] = metaData['docker'].fillna("none")
 
-    # print(metaData.columns)
+    try:
+        metaData['docker'] = metaData['docker'].fillna("none")
+    except KeyError:
+        metaData['docker'] = ["none" for _ in range(metaData.shape[0])]
+
     META_COLUMNS = ['poolname', 'shared', 'nwpn', 'cluster', 'cpu', 'constraint',
                     'node', 'account', 'time', 'qos', 'memory', 'id', 'input_size_bytes',
                     'input_compressed', 'docker']
@@ -231,8 +234,15 @@ def update(config: str = "services/config.json", alltime: bool = False) -> str:
     data['submission'] = np.where(
         data.submission.isnull(), data.start, data.submission)
     data['shared'] = data['shared'].astype(bool)
-    data.to_csv(f"{OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now():%m-%d-%Y}.csv")
+    if alltime:
+        data.to_csv(
+            f"{OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now():%m-%d-%Y}.csv")
+    else:
+        data.to_csv(
+            f"{OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now():%m-%d-%Y}-{days}.csv")
+
     print("total time", datetime.now()-start)
+    return data.shape[0]
 
 
 if __name__ == "__main__":
