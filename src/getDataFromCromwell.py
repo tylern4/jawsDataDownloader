@@ -1,12 +1,14 @@
+from collections import deque
+from datetime import datetime
 import pandas as pd
 from cromwell_tools.cromwell_auth import CromwellAuth
 from cromwell_tools import api
 import numpy as np
 import json
 from pathlib import Path
+
 import logging
-from datetime import datetime
-from collections import deque
+logging.basicConfig(level=logging.INFO)
 
 
 COLUMNS = ['end', 'id', 'name', 'start', 'status', 'submission']
