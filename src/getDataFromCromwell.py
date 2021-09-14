@@ -200,7 +200,7 @@ def update(config: str = "config.json") -> str:
         with open(fileName, 'r') as fil:
             # Read the last line of the file
             # and get the last start time in file to read from
-            TIME = deque(fil, 1)[0].split(',')[3]
+            TIME = deque(fil, 1)[0].split(',')[5]
 
         logging.info(f"Reading from {TIME}")
 
@@ -262,7 +262,7 @@ def update(config: str = "config.json") -> str:
     else:
         data.to_csv(fileName)
 
-    logging.info("total time", datetime.now()-start)
+    logging.info(f"total time {datetime.now()-start}")
     return data.shape[0]
 
 
