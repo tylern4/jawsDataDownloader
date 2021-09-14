@@ -200,7 +200,7 @@ def update(config: str = "config.json") -> str:
             # and get the last start time in file to read from
             TIME = deque(fil, 1)[0].split(',')[3]
 
-        logging.debug(f"Reading from {TIME}")
+        logging.info(f"Reading from {TIME}")
 
     if TIME is not None:
         apiResults = api.query({'status': 'Succeeded', 'start': TIME}, auth)
@@ -209,11 +209,11 @@ def update(config: str = "config.json") -> str:
 
     totalResultsCount = apiResults.json()['totalResultsCount']
     if totalResultsCount == 0:
-        logging.debug(
+        logging.info(
             f"No new results between {TIME} and {datetime.now():%m-%d-%Y}")
         exit()
     else:
-        logging.debug(f"Downloading {totalResultsCount} results")
+        logging.info(f"Downloading {totalResultsCount} results")
 
     # Create dataframe from resulting json file
     cromwellData = pd.DataFrame(apiResults.json()['results'])
@@ -256,7 +256,7 @@ def update(config: str = "config.json") -> str:
     else:
         data.to_csv(fileName)
 
-    logging.debug("total time", datetime.now()-start)
+    logging.info("total time", datetime.now()-start)
     return data.shape[0]
 
 
