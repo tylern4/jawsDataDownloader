@@ -250,6 +250,10 @@ def update(config: str = "config.json") -> str:
         data.submission.isnull(), data.start, data.submission)
     data['shared'] = data['shared'].astype(bool)
 
+    # cromwell returns from newest to oldest
+    # Reverse this for easier reading in date later
+    data = data.iloc[::-1]
+
     # If the file exists append else just write out everything
     if fileExists:
         data.to_csv(fileName,  mode='a', header=False)
