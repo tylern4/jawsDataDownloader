@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import logging
 from datetime import datetime
+from collections import deque
 
 
 COLUMNS = ['end', 'id', 'name', 'start', 'status', 'submission']
@@ -38,10 +39,10 @@ def getInputSizeBytes(cromwell_id, auth):
         if not isinstance(fileNames, list):
             fileNames = [fileNames]
         # Loop through files
-        for file in fileNames:
+        for fil in fileNames:
             # Get file stats from the path
             try:
-                total += Path(file).stat().st_size
+                total += Path(fil).stat().st_size
             except (FileNotFoundError, TypeError, PermissionError):
                 # Ignore file if we have common errors
                 pass
@@ -76,13 +77,13 @@ def getInputCompressed(cromwell_id, auth):
         if not isinstance(fileNames, list):
             fileNames = [fileNames]
         # Loop through files
-        for file in fileNames:
+        for fil in fileNames:
             # Skip if it's not a string
-            if not isinstance(file, str):
+            if not isinstance(fil, str):
                 continue
             # Split the directory struture
             # and get the last value -> file
-            filename = file.split("/")[-1]
+            filename = fil.split("/")[-1]
             # Split the filename struture
             # and get the last value -> file-extension
             # Check if file-extension is bz2/gz the common compression formats
@@ -136,13 +137,13 @@ def getMetaDataInfo(cromwell_id, auth):
         if not isinstance(fileNames, list):
             fileNames = [fileNames]
         # Loop through files
-        for file in fileNames:
+        for fil in fileNames:
             # Skip if it's not a string
-            if not isinstance(file, str):
+            if not isinstance(fil, str):
                 continue
             # Split the directory struture
             # and get the last value -> file
-            filename = file.split("/")[-1]
+            filename = fil.split("/")[-1]
             # Split the filename struture
             # and get the last value -> file-extension
             # Check if file-extension is bz2/gz the common compression formats
@@ -150,7 +151,7 @@ def getMetaDataInfo(cromwell_id, auth):
                 # If any file is compressed return compressed
                 compressed = True
             try:
-                total += Path(file).stat().st_size
+                total += Path(fil).stat().st_size
             except (FileNotFoundError, TypeError, PermissionError):
                 # Ignore file if we have common errors
                 pass
@@ -175,7 +176,7 @@ def getMemory(mem, memory):
         return np.nan
 
 
-def update(config: str = "config.json", alltime: bool = False, days: int = 0) -> str:
+def update(config: str = "config.json") -> str:
     try:
         with open(config, 'r') as f:
             config = json.load(f)
@@ -188,17 +189,31 @@ def update(config: str = "config.json", alltime: bool = False, days: int = 0) ->
     start = datetime.now()
     # Authenticate with Cromwell with no Auth
     auth = CromwellAuth.harmonize_credentials(url=CROMWELL_URL)
-    if not alltime:
-        TIME = f'{start.year}-{start.month:02d}-{start.day-days:02d}T00:00:00.000Z'
+    # Check if we have the file already
+    fileName = f"{OUTPUT_DIR}/{OUTPUT_NAME}.csv"
+    fileExists = Path(fileName).exists()
+    TIME = None
+    # If csv exists
+    if fileExists:
+        with open(fileName, 'r') as fil:
+            # Read the last line of the file
+            # and get the last start time in file to read from
+            TIME = deque(fil, 1)[0].split(',')[3]
+
+        logging.log(f"Reading from {TIME}")
+
+    if TIME is not None:
         apiResults = api.query({'status': 'Succeeded', 'start': TIME}, auth)
     else:
         apiResults = api.query({'status': 'Succeeded'}, auth)
 
     totalResultsCount = apiResults.json()['totalResultsCount']
     if totalResultsCount == 0:
+        logging.log(
+            f"No new results between {TIME} and {datetime.now():%m-%d-%Y}")
         exit()
     else:
-        print(f"Downloading {totalResultsCount} results")
+        logging.log(f"Downloading {totalResultsCount} results")
 
     # Create dataframe from resulting json file
     cromwellData = pd.DataFrame(apiResults.json()['results'])
@@ -234,14 +249,14 @@ def update(config: str = "config.json", alltime: bool = False, days: int = 0) ->
     data['submission'] = np.where(
         data.submission.isnull(), data.start, data.submission)
     data['shared'] = data['shared'].astype(bool)
-    if alltime:
-        data.to_csv(
-            f"{OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now():%m-%d-%Y}.csv")
-    else:
-        data.to_csv(
-            f"{OUTPUT_DIR}/{OUTPUT_NAME}_{datetime.now():%m-%d-%Y}-{days}.csv")
 
-    print("total time", datetime.now()-start)
+    # If the file exists append else just write out everything
+    if fileExists:
+        data.to_csv(fileName,  mode='a', header=False)
+    else:
+        data.to_csv(fileName)
+
+    logging.log("total time", datetime.now()-start)
     return data.shape[0]
 
 
