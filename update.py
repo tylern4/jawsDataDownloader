@@ -8,7 +8,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.alltime and args.days != 0:
-        print("Warning\nIgnoring the number of days argument\nGetting all data!")
-
     print(update(config=args.config))
