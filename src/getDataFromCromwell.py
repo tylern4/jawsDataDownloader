@@ -212,7 +212,7 @@ def update(config: str = "config.json") -> str:
     totalResultsCount = apiResults.json()['totalResultsCount']
     if totalResultsCount == 0:
         logging.info(
-            f"No new results between {TIME} and {datetime.now():%m-%d-%Y}")
+            f"No new results between {TIME} and {datetime.now()}")
         exit()
     else:
         logging.info(f"Downloading {totalResultsCount} results")
