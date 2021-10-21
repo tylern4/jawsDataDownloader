@@ -19,7 +19,7 @@ def getInputSizeBytes(cromwell_id, auth):
     """
     Loop through the input files from a job and add together the total bytes.
     """
-
+    # return np.nan
     # Try to get the metadata if not log the error
     try:
         metaData = api.metadata(cromwell_id, auth).json()
@@ -195,6 +195,7 @@ def update(config: str = "config.json") -> str:
     fileName = f"{OUTPUT_DIR}/{OUTPUT_NAME}.csv"
     fileExists = Path(fileName).exists()
     TIME = None
+    # TIME = "2021-09-14T15:04:45.825Z"
     # If csv exists
     if fileExists:
         with open(fileName, 'r') as fil:
@@ -223,7 +224,7 @@ def update(config: str = "config.json") -> str:
     # Only keep these columns
     COLUMNS = ['name', 'id', 'submission', 'start', 'end']
     cromwellData = cromwellData[COLUMNS]
-    cromwellData['start']
+    # cromwellData['start']
 
     metaData = getMetaDataInfo(cromwellData.id, auth)
     metaData = pd.DataFrame.from_records(metaData)
@@ -243,15 +244,20 @@ def update(config: str = "config.json") -> str:
     META_COLUMNS = ['poolname', 'shared', 'nwpn', 'cluster', 'cpu', 'constraint',
                     'node', 'account', 'time', 'qos', 'memory', 'id', 'input_size_bytes',
                     'input_compressed', 'docker']
-    metaData = metaData[META_COLUMNS]
+    try:
+        metaData = metaData[META_COLUMNS]
+    except Exception as e:
+        print(e)
 
     data = pd.merge(left=cromwellData, right=metaData,
                     left_on='id', right_on='id')
-    data = data[~data.account.isnull()]
-    data['submission'] = np.where(
-        data.submission.isnull(), data.start, data.submission)
-    data['shared'] = data['shared'].astype(bool)
-
+    try:
+        data = data[~data.account.isnull()]
+        data['submission'] = np.where(
+            data.submission.isnull(), data.start, data.submission)
+        data['shared'] = data['shared'].astype(bool)
+    except Exception as e:
+        print(e)
     # cromwell returns from newest to oldest
     # Reverse this for easier reading in date later
     data = data.iloc[::-1]
