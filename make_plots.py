@@ -115,7 +115,6 @@ def read_job(slurm_cluster, jobid, sampler, output_root="/global/cscratch1/sd/us
 def plot_vertical(_data, set_log=False):
     data = _data[1]
     rolling = 120
-
     try:
         proctstat = read_job("cori", data.JobID, "procstat_Hsw64", "/global/cscratch1/sd/usgweb/ldms_output").set_index('Time')
         proctstat = proctstat[['ProducerName','idle','user']]
@@ -127,6 +126,7 @@ def plot_vertical(_data, set_log=False):
         df_lustre = read_job("cori", data.JobID, "lustre_llite").set_index('Time').sort_index()
 
     except ValueError:
+        # print("Not Working")
         return None
 
     fig, ax = plt.subplots(3,1,figsize=[12,6], sharex=True)
@@ -135,18 +135,34 @@ def plot_vertical(_data, set_log=False):
     for _ax in ax.flatten():
         _ax.xaxis.set_major_formatter(date_form)
         _ax.grid(True)
+        # Cut axis at Slurm start and end
+        _ax.set_xlim(left=data.Start+datetime.timedelta(seconds=rolling)*0.9,
+                            right=data.End+datetime.timedelta(seconds=rolling)*1.1)
         if set_log:
             _ax.set_yscale('symlog')
         try:
-            _ax.axvline(data.start+datetime.timedelta(seconds=rolling), c='#007AC8')
-            _ax.axvline(data.end+datetime.timedelta(seconds=rolling), c='#007AC8')
-            
-            _ax.axvline(data.Start+datetime.timedelta(seconds=rolling), c='#CC5500')
-            _ax.axvline(data.End+datetime.timedelta(seconds=rolling), c='#CC5500')
-        except:
             pass
+            # Cromwell start and end lines
+            #_ax.axvline(data.start+datetime.timedelta(seconds=rolling), c='#007AC8')
+            #_ax.axvline(data.end+datetime.timedelta(seconds=rolling), c='#007AC8')
 
-    fig.suptitle(data.JobName)
+            # Slurm start and end lines
+            #_ax.axvline(data.Start+datetime.timedelta(seconds=rolling), c='#CC5500')
+            #_ax.axvline(data.End+datetime.timedelta(seconds=rolling), c='#CC5500')
+        except:
+            print("Not Working ax")
+            pass
+    try:
+        overtime = (data.End - data.end.tz_convert(None)).seconds
+        hours = overtime//3600
+        minutes = (overtime//60)%60
+        if hours == 0:
+            fig.suptitle(f'{data.JobName}\nOver time {minutes:02d} min.')
+        else:
+            fig.suptitle(f'{data.JobName}\nOver time {hours:02d} hrs {minutes:02d} min')
+
+    except:
+        fig.suptitle(f'{data.JobName}')
 
     idle = proctstat['idle'].rolling(rolling).apply(lambda x: x.iloc[-1] - x.iloc[0])
     user = proctstat['user'].rolling(rolling).apply(lambda x: x.iloc[-1] - x.iloc[0])
@@ -174,10 +190,57 @@ def plot_vertical(_data, set_log=False):
         top = 0
     if top != 0:
         ax[2].set_ylim(0, top)
-
+    print(f"trying to save plots/{data.Account}/{data.Group}/{data.User}/{data.JobName}_{data.Time}.png")
     Path(f'plots/{data.Account}/{data.Group}/{data.User}').mkdir(parents=True, exist_ok=True)
     plt.savefig(f"plots/{data.Account}/{data.Group}/{data.User}/{data.JobName}_{data.Time}.png")
     plt.close(fig)
+
+    ####################
+    fig, ax = plt.subplots(3,1,figsize=[12,6], sharex=True)
+    fig.subplots_adjust(wspace=0, hspace=0.05)
+    date_form = DateFormatter("%H:%M")
+    for _ax in ax.flatten():
+        _ax.xaxis.set_major_formatter(date_form)
+        _ax.grid(True)
+        if set_log:
+            _ax.set_yscale('symlog')
+        try:
+            # Cut axis at Slurm start and Cromwell end
+            _ax.set_xlim(left=data.Start+datetime.timedelta(seconds=rolling)*0.9,
+                            right=data.end+datetime.timedelta(seconds=rolling)*1.1)
+
+        except:
+            pass
+
+    fig.suptitle(data.JobName)
+
+    idle = proctstat['idle'].rolling(rolling).apply(lambda x: x.iloc[-1] - x.iloc[0])
+    user = proctstat['user'].rolling(rolling).apply(lambda x: x.iloc[-1] - x.iloc[0])
+    user = user/(user+idle)
+    sns.lineplot(x=proctstat.index, y=user, ax=ax[0], legend=False, ci='sd')
+
+    ax[0].set_ylabel('CPU Utilization')
+    ax[0].axhline(100*data.ReqCPUS/64, dashes=(1, 2, 1, 2))
+
+    sns.lineplot(x=df_mem.index, y=df_mem.MemUsed.rolling(rolling).mean(), ax=ax[1])
+    ax[1].axhline(data.ReqMemNode * 1e-9, dashes=(1, 2, 1, 2))
+
+
+    read_bytes = (df_lustre['client.read_bytes.rate#llite.snx11168'] * 1e-6).rolling(rolling).mean()
+    write_bytes = (df_lustre['client.write_bytes.rate#llite.snx11168'] * 1e-6).rolling(rolling).mean()
+    sns.lineplot(x=df_lustre.index, y=read_bytes, ax=ax[2])
+    sns.lineplot(x=df_lustre.index, y=write_bytes, ax=ax[2])
+    ax[2].set_ylabel('Transfer Rate Bytes')
+    try:
+        top = int(1.5*np.max([np.max(read_bytes), np.max(write_bytes)]))
+    except ValueError:
+        top = 0
+    if top != 0:
+        ax[2].set_ylim(0, top)
+
+    plt.savefig(f"plots/{data.Account}/{data.Group}/{data.User}/zoomed_{data.JobName}_{data.Time}.png")
+    plt.close(fig)
+
     return data.JobName
 
 
@@ -186,24 +249,44 @@ def plot_vertical(_data, set_log=False):
 
 if __name__ == "__main__":
 
-    con = sqlite3.connect("/global/cfs/cdirs/nstaff/tylern/slurmInfo/genepool.sqlite3")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--jaws', action=argparse.BooleanOptionalAction,
+                        help='Load in jaws cromwell data or not.',
+                        default=False,
+                        )
+
+    parser.add_argument('--threads',
+                        help='Number of threads for plotting.',
+                        default=2)
+
+    args = parser.parse_args()
+
+    print("loading slurm data")
+    con = sqlite3.connect("/global/cscratch1/sd/tylern/genepool.sqlite3")
     cur = con.cursor()
 
     keepColumns = 'JobID,ArrayTaskID,Partition,JobName,User,"Group",Account,State,Timelimit,Elapsed,Time,Submit,Start,End,Priority,ConsumedEnergy,ReqCPUS,AllocCPUS,CPUTime,TotalCPU,UserCPU,SystemCPU,ReqMemNode,ReqMemCPU'
     parse_dates = ['Time','Submit','Start','End']
     slurm_data = pd.read_sql(f"SELECT {keepColumns} FROM allocations WHERE JobID > 44229702", con, parse_dates=parse_dates)
-
-    files = ["/global/cfs/cdirs/nstaff/tylern/jawsData/coriDev.csv",
+    if args.jaws:
+        print("loading cromwell data")
+        files = ["/global/cfs/cdirs/nstaff/tylern/jawsData/coriDev.csv",
              "/global/cfs/cdirs/nstaff/tylern/jawsData/coriProd.csv",
+             "/global/cfs/cdirs/nstaff/tylern/jawsData/coriStaging.csv"
              ]
 
-    loadedDF = loadData(files)
-    cromwell_data = pd.concat(loadedDF)
+        loadedDF = loadData(files)
+        cromwell_data = pd.concat(loadedDF)
 
-    split_ = lambda x : x.split('_')[-1]
-    slurm_data['cromwell_id'] = slurm_data.JobName.apply(split_)
-    all_data = cromwell_data.merge(slurm_data, left_on='id', right_on='cromwell_id')
+        split_ = lambda x : x.split('_')[-1]
+        slurm_data['cromwell_id'] = slurm_data.JobName.apply(split_)
+        print("merging data")
+        all_data = cromwell_data.merge(slurm_data, left_on='id', right_on='cromwell_id')
+    else:
+        all_data = slurm_data
+    print("starting pool")
 
-    with Pool(2) as p:
+    with Pool(int(args.threads)) as p:
         p.map(plot_vertical, all_data.iterrows())
 

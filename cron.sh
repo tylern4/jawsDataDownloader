@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+# . /etc/bash.bashrc.local
 # source activate cromwell
 
 cd /global/cfs/cdirs/nstaff/tylern/jawsDataDownloader
